@@ -1,5 +1,4 @@
-
-            import streamlit as st
+import streamlit as st
 import google.generativeai as genai
 from gtts import gTTS
 import base64
@@ -11,10 +10,10 @@ st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>"
 # ၂။ API Key ချိတ်ဆက်ခြင်း
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # ပိုပြီး တည်ငြိမ်တဲ့ model နာမည်ကို သုံးမယ်
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    # model နာမည်ကို အသေချာဆုံးဖြစ်အောင် gemini-1.5-flash ပဲ သုံးပါမယ်
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets မှာ ထည့်ပေးပါရှင်။")
+    st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets မှာ ထည့်ပေးပါ။")
 
 # ၃။ အသံထွက်ပေးမည့် function
 def speak(text):
@@ -24,11 +23,7 @@ def speak(text):
         with open("speech.mp3", "rb") as f:
             data = f.read()
             b64 = base64.b64encode(data).decode()
-            md = f"""
-                <audio autoplay="true">
-                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-                </audio>
-                """
+            md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
             st.markdown(md, unsafe_allow_html=True)
     except:
         pass
