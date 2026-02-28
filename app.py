@@ -3,18 +3,18 @@ import google.generativeai as genai
 from gtts import gTTS
 import base64
 
-# Page Layout
+# Page Title
 st.set_page_config(page_title="အမရာဒေဝီ AI", page_icon="💃")
 st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>", unsafe_allow_html=True)
 
 # Gemini Setup
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    # model နာမည်ကို အမှန်ကန်ဆုံးဖြစ်အောင် ပြင်ထားပါတယ်
     model = genai.GenerativeModel('gemini-1.5-flash')
 else:
-    st.error("Secrets ထဲမှာ API Key ကို စစ်ပေးပါရှင်။")
+    st.error("Secrets ထဲမှာ API Key မရှိသေးပါရှင်။")
 
-# Audio Function
 def speak(text):
     try:
         tts = gTTS(text=text, lang='my')
@@ -27,7 +27,6 @@ def speak(text):
     except:
         pass
 
-# Chat Logic
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -42,11 +41,11 @@ if prompt := st.chat_input("အမရာဒေဝီကို တစ်ခုခ
 
     with st.chat_message("assistant"):
         try:
-            role = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ဖြေပေးပါ။"
-            response = model.generate_content(f"{role}\n{prompt}")
+            instruction = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ဖြေပေးပါ။"
+            response = model.generate_content(f"{instruction}\nမေးခွန်း: {prompt}")
             reply = response.text
             st.markdown(reply)
             st.session_state.messages.append({"role": "assistant", "content": reply})
             speak(reply)
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"အမရာ စကားပြောဖို့ ခေတ္တအခက်အခဲရှိနေတယ်ရှင်။ (Error: {e})")
