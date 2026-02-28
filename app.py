@@ -3,19 +3,19 @@ import google.generativeai as genai
 from gtts import gTTS
 import base64
 
-# ၁။ စာမျက်နှာ အပြင်အဆင်
+# ၁။ Page Config
 st.set_page_config(page_title="အမရာဒေဝီ AI", page_icon="💃")
 st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>", unsafe_allow_html=True)
 
-# ၂။ API Key ချိတ်ဆက်ခြင်း
+# ၂။ API Key & Model Setup
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # model နာမည်ကို အသေချာဆုံးဖြစ်အောင် gemini-1.5-flash ပဲ သုံးပါမယ်
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 404 error မတက်အောင် models/ ပါအောင် ထည့်ထားပါတယ်
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
 else:
     st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets မှာ ထည့်ပေးပါ။")
 
-# ၃။ အသံထွက်ပေးမည့် function
+# ၃။ Audio Function
 def speak(text):
     try:
         tts = gTTS(text=text, lang='my')
@@ -28,7 +28,7 @@ def speak(text):
     except:
         pass
 
-# ၄။ Chat စနစ်
+# ၄။ Session State
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -36,6 +36,7 @@ for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
+# ၅။ Chat Input
 if prompt := st.chat_input("အမရာဒေဝီကို တစ်ခုခု မေးပါ..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -43,11 +44,15 @@ if prompt := st.chat_input("အမရာဒေဝီကို တစ်ခုခ
 
     with st.chat_message("assistant"):
         try:
-            instruction = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ တိုတိုနဲ့ ချိုချိုသာသာ ဖြေပေးပါ။"
-            response = model.generate_content(f"{instruction}\nမေးခွန်း: {prompt}")
+            # အမရာဒေဝီရဲ့ ကိုယ်ရည်ကိုယ်သွေး
+            instruction = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။"
+            full_prompt = f"{instruction}\nမေးခွန်း: {prompt}"
+            
+            response = model.generate_content(full_prompt)
             reply = response.text
+            
             st.markdown(reply)
             st.session_state.messages.append({"role": "assistant", "content": reply})
             speak(reply)
         except Exception as e:
-            st.error(f"အမရာ စကားပြောဖို့ ခဏလေး အခက်အခဲဖြစ်သွားတယ်ရှင်။ (Error: {e})")
+            st.error(f"အမရာ စကားပြောဖို့ ခေတ္တအခက်အခဲရှိနေတယ်ရှင်။ (Error: {e})")
