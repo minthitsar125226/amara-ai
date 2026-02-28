@@ -3,19 +3,19 @@ import google.generativeai as genai
 from gtts import gTTS
 import base64
 
-# ၁။ Page Setup
+# Page Setup
 st.set_page_config(page_title="အမရာဒေဝီ AI", page_icon="💃")
 st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>", unsafe_allow_html=True)
 
-# ၂။ API Configuration
+# API Configuration
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # 404 Error မတက်အောင် model နာမည်ကို အသေချာဆုံးပုံစံ ပြောင်းထားပါတယ်
+    # 404 error ပျောက်အောင် နာမည်အပြည့်အစုံ ပြောင်းထားပါတယ်
     model = genai.GenerativeModel('gemini-1.5-flash-latest')
 else:
     st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets ကို စစ်ပေးပါ။")
 
-# ၃။ Audio Function
+# Audio Function
 def speak(text):
     try:
         tts = gTTS(text=text, lang='my')
@@ -28,7 +28,7 @@ def speak(text):
     except:
         pass
 
-# ၄။ Chat System
+# Chat Logic
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -50,4 +50,4 @@ if prompt := st.chat_input("အမရာဒေဝီကို တစ်ခုခ
             st.session_state.messages.append({"role": "assistant", "content": reply})
             speak(reply)
         except Exception as e:
-            st.error(f"အမရာ စကားပြောဖို့ ခဏလေး အခက်အခဲဖြစ်သွားတယ်ရှင်။ (Error: {e})")
+            st.error(f"Error: {e}")
