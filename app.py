@@ -7,37 +7,37 @@ import base64
 st.set_page_config(page_title="အမရာဒေဝီ AI", page_icon="💃")
 st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>", unsafe_allow_html=True)
 
-# ၂။ Smart Model Selection System
+# ၂။ Smart Model Selection (အကုန်စမ်းမည့်စနစ်)
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     
-    # အလုပ်လုပ်နိုင်ခြေရှိတဲ့ Model စာရင်း
-    available_models = [
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash',
-        'gemini-1.5-pro-latest',
+    # ရနိုင်သမျှ Model နာမည်အကုန်လုံး
+    test_models = [
+        'gemini-1.5-flash', 
+        'gemini-1.5-flash-latest', 
+        'gemini-1.0-pro', 
         'gemini-pro'
     ]
     
-    # အလုပ်လုပ်တဲ့ Model ကို အလိုအလျောက် ရှာဖွေခြင်း
-    if "active_model" not in st.session_state:
-        st.session_state.active_model = None
-        for model_name in available_models:
+    if "active_model_name" not in st.session_state:
+        st.session_state.active_model_name = None
+        for m_name in test_models:
             try:
-                test_model = genai.GenerativeModel(model_name)
-                # စမ်းသပ် စာရိုက်ကြည့်ခြင်း
-                test_model.generate_content("test", generation_config={"max_output_tokens": 1})
-                st.session_state.active_model = model_name
+                m = genai.GenerativeModel(m_name)
+                # တကယ် အလုပ်လုပ်လား စမ်းသပ်တာပါ
+                m.generate_content("Hi", generation_config={"max_output_tokens": 1})
+                st.session_state.active_model_name = m_name
                 break
             except:
                 continue
-                
-    if st.session_state.active_model:
-        model = genai.GenerativeModel(st.session_state.active_model)
+
+    if st.session_state.active_model_name:
+        model = genai.GenerativeModel(st.session_state.active_model_name)
     else:
-        st.error("သင့် API Key နှင့် ကိုက်ညီသော Model ရှာမတွေ့ပါ။")
+        # ဘာမှရှာမတွေ့ရင်တောင် Default တစ်ခုထားပေးပါမယ်
+        model = genai.GenerativeModel('gemini-pro')
 else:
-    st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets တွင် ထည့်ပေးပါ။")
+    st.error("API Key မတွေ့ပါ။ Settings > Secrets မှာ ထည့်ပေးပါ။")
 
 # ၃။ Audio Function
 def speak(text):
