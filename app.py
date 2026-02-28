@@ -10,8 +10,8 @@ st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>"
 # ၂။ API Key & Model Setup
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    # 404 error မတက်အောင် models/ ပါအောင် ထည့်ထားပါတယ်
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    
+     genai.GenerativeModel('models/gemini-1.5-flash')
 else:
     st.error("API Key မတွေ့ပါ။ Manage app > Settings > Secrets မှာ ထည့်ပေးပါ။")
 
