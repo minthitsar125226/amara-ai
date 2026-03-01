@@ -5,47 +5,38 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
-# ၁။ API Keys (Render Variables ထဲက ဖတ်မယ်)
+# ၁။ API Keys (Render Variables ထဲမှာ GROQ_API_KEY လို့ နာမည်ပေးပါ)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-# ၂။ AI Response Logic (Version နှင့် Model အကုန်လုံးကို လှည့်စမ်းပေးမည့်စနစ်)
+# ၂။ Groq AI Response (Gemini ထက် ပိုမြန်ပြီး တည်ငြိမ်ပါတယ်)
 def get_chat_response(prompt):
-    # စမ်းသပ်မည့် Endpoint ပေါင်းစပ်မှုများ
-    test_configs = [
-        {"ver": "v1beta", "model": "gemini-1.5-flash"},
-        {"ver": "v1", "model": "gemini-pro"},
-        {"ver": "v1beta", "model": "gemini-pro"},
-        {"ver": "v1", "model": "gemini-1.5-flash"}
-    ]
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။"},
+            {"role": "user", "content": prompt}
+        ]
+    }
     
-    for config in test_configs:
-        v = config["ver"]
-        m = config["model"]
-        url = f"https://generativelanguage.googleapis.com/{v}/models/{m}:generateContent?key={GEMINI_KEY}"
-        headers = {'Content-Type': 'application/json'}
-        data = {
-            "contents": [{
-                "parts": [{"text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။\nUser: {prompt}"}]
-            }]
-        }
-        
-        try:
-            response = requests.post(url, headers=headers, json=data, timeout=10)
-            result = response.json()
-            if 'candidates' in result:
-                return result['candidates'][0]['content']['parts'][0]['text']
-        except:
-            continue
-            
-    return "အမရာ အခု စကားပြောဖို့ အားနည်းနေလို့ပါရှင်။ ခဏနေမှ ပြန်လာခဲ့ပေးပါဦးနော်။"
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=15)
+        result = response.json()
+        return result['choices'][0]['message']['content']
+    except Exception as e:
+        return f"အမရာ ခဏလေး အနားယူနေလို့ပါရှင်။ (Error: {str(e)})"
 
 # ၃။ Render Health Check
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Amara Online")
+        self.wfile.write(b"Amara is online")
 
 def run_health_check():
     port = int(os.environ.get("PORT", 10000))
@@ -54,7 +45,7 @@ def run_health_check():
 
 # ၄။ Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ အဆင့်သင့်ရှိနေပါပြီ။")
+    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ အသင့်ရှိနေပါပြီ။")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
