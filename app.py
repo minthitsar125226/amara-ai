@@ -9,38 +9,43 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ၂။ Gemini API Call (v1 Stable Version ကို တိုက်ရိုက်ခေါ်ခြင်း)
+# ၂။ AI Response Logic (Version နှင့် Model အကုန်လုံးကို လှည့်စမ်းပေးမည့်စနစ်)
 def get_chat_response(prompt):
-    # v1beta အစား v1 ကို သုံးကြည့်ပါမယ်
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{
-            "parts": [{"text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။\nUser: {prompt}"}]
-        }]
-    }
+    # စမ်းသပ်မည့် Endpoint ပေါင်းစပ်မှုများ
+    test_configs = [
+        {"ver": "v1beta", "model": "gemini-1.5-flash"},
+        {"ver": "v1", "model": "gemini-pro"},
+        {"ver": "v1beta", "model": "gemini-pro"},
+        {"ver": "v1", "model": "gemini-1.5-flash"}
+    ]
     
-    try:
-        response = requests.post(url, headers=headers, json=data, timeout=15)
-        result = response.json()
+    for config in test_configs:
+        v = config["ver"]
+        m = config["model"]
+        url = f"https://generativelanguage.googleapis.com/{v}/models/{m}:generateContent?key={GEMINI_KEY}"
+        headers = {'Content-Type': 'application/json'}
+        data = {
+            "contents": [{
+                "parts": [{"text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။\nUser: {prompt}"}]
+            }]
+        }
         
-        # အဖြေရရင် ပြန်ပေးမယ်
-        if 'candidates' in result:
-            return result['candidates'][0]['content']['parts'][0]['text']
-        else:
-            # API က ပြန်လာတဲ့ Error message အစစ်ကို ထုတ်ပြမယ်
-            error_info = result.get('error', {}).get('message', 'Unknown API Error')
-            return f"Error ပါရှင် (API Message: {error_info})"
+        try:
+            response = requests.post(url, headers=headers, json=data, timeout=10)
+            result = response.json()
+            if 'candidates' in result:
+                return result['candidates'][0]['content']['parts'][0]['text']
+        except:
+            continue
             
-    except Exception as e:
-        return f"ချိတ်ဆက်မှု Error တက်နေပါတယ်ရှင် (System: {str(e)})"
+    return "အမရာ အခု စကားပြောဖို့ အားနည်းနေလို့ပါရှင်။ ခဏနေမှ ပြန်လာခဲ့ပေးပါဦးနော်။"
 
-# ၃။ Render Health Check (Port Binding အတွက်)
+# ၃။ Render Health Check
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Amara is online")
+        self.wfile.write(b"Amara Online")
 
 def run_health_check():
     port = int(os.environ.get("PORT", 10000))
@@ -49,7 +54,7 @@ def run_health_check():
 
 # ၄။ Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ အသင့်ရှိနေပါပြီ။ တစ်ခုခု မေးမြန်းနိုင်ပါတယ်ရှင်။")
+    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ အဆင့်သင့်ရှိနေပါပြီ။")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
