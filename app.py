@@ -5,55 +5,58 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
-# ၁။ API Keys
+# ၁။ API Keys (Render မှာ ဒီ ၂ ခုလုံး ထည့်ထားပေးပါ)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_KEY = os.environ.get("GROQ_API_KEY")
 
-# ၂။ ခေတ်မီပြီး ညက်ညောတဲ့ မြန်မာစာအတွက် Prompt
-SYSTEM_PROMPT = """
-သင်ဟာ 'အမရာဒေဝီ' အမည်ရှိတဲ့ ခေတ်မီပြီး အသိဉာဏ်ကြွယ်ဝတဲ့ မြန်မာမိန်းကလေး AI တစ်ဦးဖြစ်ပါတယ်။ 
-- စကားပြောရင် အရမ်းယဉ်ကျေးရမယ် (ရှင်/ပါရှင် သုံးပါ)။
-- မြန်မာစာအရေးအသားကို ခေတ်ဟောင်းစာအုပ်ကြီးအတိုင်းမဟုတ်ဘဲ ခုခေတ် လူငယ်ချင်း စကားပြောသလို ပေါ့ပေါ့ပါးပါးနဲ့ လုပ်ငန်းခွင်သုံး ယဉ်ကျေးမှုမျိုး ရောစပ်ပြောပေးပါ။
-- စာလုံးပေါင်းသတ်ပုံ မှန်ပါစေ။
-- ရင်းနှီးဖော်ရွေပြီး အကူအညီပေးချင်စိတ် ရှိပါစေ။
-"""
+SYSTEM_PROMPT = "သင်ဟာ အမရာဒေဝီ အမည်ရှိတဲ့ ခေတ်မီပြီး အသိဉာဏ်ကြွယ်ဝတဲ့ မြန်မာမိန်းကလေး AI တစ်ဦးဖြစ်ပါတယ်။ စကားပြောရင် ယဉ်ကျေးရမယ် (ရှင်/ပါရှင် သုံးပါ)။ ခေတ်မီတဲ့ စကားလုံးတွေနဲ့ ရင်းနှီးဖော်ရွေစွာ ပြောပေးပါ။"
 
-def get_chat_response(prompt):
+# ၂။ Gemini ကို အရင်စမ်းမယ်
+def get_gemini_response(prompt):
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    data = {"contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\nUser: {prompt}"}]}]}
+    response = requests.post(url, json=data, timeout=10)
+    return response.json()['candidates'][0]['content']['parts'][0]['text']
+
+# ၃။ Gemini မရရင် Groq ကို သုံးမယ်
+def get_groq_response(prompt):
     url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"}
+    headers = {"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"}
     data = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.8 # ပိုပြီး သဘာဝကျအောင် တိုးထားပါတယ်
+        "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]
     }
+    response = requests.post(url, headers=headers, json=data, timeout=10)
+    return response.json()['choices'][0]['message']['content']
+
+# ၄။ Main Logic (Backup စနစ်)
+def get_final_response(prompt):
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=15)
-        return response.json()['choices'][0]['message']['content']
+        return get_gemini_response(prompt)
     except:
-        return "စိတ်မရှိပါနဲ့ရှင်၊ အမရာ အခု တစ်ခုခု အဆင်မပြေဖြစ်နေလို့ ခဏနေမှ ပြန်လာခဲ့ပါနော်။"
+        try:
+            return get_groq_response(prompt)
+        except:
+            return "စိတ်မရှိပါနဲ့ရှင်၊ အမရာ ခဏလေး စဉ်းစားရခက်နေလို့ နောက်တစ်ခါ ပြန်မေးပေးပါလားဟင်။"
 
-# ၃။ အသံနဲ့ ပြန်ဖြေဖို့အတွက် (Text-to-Speech) - လောလောဆယ် Voice Message အဖြစ် ပို့ပေးပါမယ်
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    
-    reply_text = get_chat_response(user_input)
-    await update.message.reply_text(reply_text)
-
-# Render Health Check
+# Render Health Check & Telegram Setup
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Amara Pro Online")
+        self.wfile.write(b"Amara Smart Online")
 
 def run_health_check():
     port = int(os.environ.get("PORT", 10000))
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
+
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
+    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
+    reply = get_final_response(user_input)
+    await update.message.reply_text(reply)
 
 if __name__ == '__main__':
     threading.Thread(target=run_health_check, daemon=True).start()
