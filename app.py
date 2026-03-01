@@ -1,36 +1,41 @@
 import os
 import threading
+import requests
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-import google.generativeai as genai
 
-# ၁။ API Keys
+# ၁။ API Keys (Render Variables ထဲက ဖတ်မယ်)
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 
-# ၂။ Gemini Setup (ဗားရှင်းအသစ်နဲ့ အမှားကင်းအောင် ချိတ်ခြင်း)
-genai.configure(api_key=GEMINI_KEY)
-
+# ၂။ Gemini API Call (v1 Stable Version ကို တိုက်ရိုက်ခေါ်ခြင်း)
 def get_chat_response(prompt):
-    # အလုပ်လုပ်နိုင်ခြေအရှိဆုံး Model များ
-    models_to_try = ['gemini-1.5-flash', 'gemini-1.0-pro']
+    # v1beta အစား v1 ကို သုံးကြည့်ပါမယ်
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    headers = {'Content-Type': 'application/json'}
+    data = {
+        "contents": [{
+            "parts": [{"text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။\nUser: {prompt}"}]
+        }]
+    }
     
-    for m_name in models_to_try:
-        try:
-            model = genai.GenerativeModel(m_name)
-            # အဖြေထုတ်ပေးခြင်း
-            response = model.generate_content(
-                f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။\nUser: {prompt}",
-                generation_config={"temperature": 0.7}
-            )
-            return response.text
-        except Exception as e:
-            print(f"Model {m_name} failed: {e}")
-            continue
-    return "Error: API Key သို့မဟုတ် Model အဆင်မပြေပါ။ Key အသစ်ထပ်ယူကြည့်ပါဦးရှင်။"
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=15)
+        result = response.json()
+        
+        # အဖြေရရင် ပြန်ပေးမယ်
+        if 'candidates' in result:
+            return result['candidates'][0]['content']['parts'][0]['text']
+        else:
+            # API က ပြန်လာတဲ့ Error message အစစ်ကို ထုတ်ပြမယ်
+            error_info = result.get('error', {}).get('message', 'Unknown API Error')
+            return f"Error ပါရှင် (API Message: {error_info})"
+            
+    except Exception as e:
+        return f"ချိတ်ဆက်မှု Error တက်နေပါတယ်ရှင် (System: {str(e)})"
 
-# ၃။ Render Health Check Server
+# ၃။ Render Health Check (Port Binding အတွက်)
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -42,13 +47,12 @@ def run_health_check():
     server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
     server.serve_forever()
 
-# ၄။ Telegram Bot Logic
+# ၄။ Telegram Bot Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ နိုးထလာပါပြီ။")
+    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ အသင့်ရှိနေပါပြီ။ တစ်ခုခု မေးမြန်းနိုင်ပါတယ်ရှင်။")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
-    # အမရာလေး စာပြန်ဖို့ ကြိုးစားနေတာကို ပြခြင်း
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     reply = get_chat_response(user_input)
     await update.message.reply_text(reply)
