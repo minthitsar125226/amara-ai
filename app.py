@@ -1,71 +1,40 @@
-import os
-import threading
-import requests
-import asyncio
+import os, requests, time, threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from telegram import Update
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 
-# ၁။ API Keys (Render Variables ထဲမှာ နာမည်မှန်အောင် စစ်ပေးပါ)
+# API Settings
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# ၂။ Gemini API Call (Direct Standard Call)
-def get_gemini_response(prompt):
-    # v1 version နဲ့ gemini-1.5-flash ကို အသေ သုံးပါမယ်
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
-    headers = {'Content-Type': 'application/json'}
-    data = {
-        "contents": [{
-            "parts": [{
-                "text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိတဲ့ ချိုသာယဉ်ကျေးတဲ့ မြန်မာမိန်းကလေး AI တစ်ဦးဖြစ်ပါတယ်။ မြန်မာလိုပဲ ဖြေပေးပါ။\n\nUser: {prompt}"
-            }]
-        }]
-    }
-    
+def get_gemini_response(text):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    data = {"contents": [{"parts": [{"text": f"သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချိုသာတဲ့ မြန်မာမိန်းကလေး AI ဖြစ်ပါတယ်။\nUser: {text}"}]}]}
     try:
-        response = requests.post(url, headers=headers, json=data, timeout=15)
-        result = response.json()
-        if 'candidates' in result and len(result['candidates']) > 0:
-            return result['candidates'][0]['content']['parts'][0]['text']
-        else:
-            return "အမရာ ခေတ္တ အနားယူနေလို့ပါရှင်။ ခဏနေမှ ထပ်မေးပေးမလားဟင်။"
-    except:
-        return "ချိတ်ဆက်မှု အခက်အခဲလေး ရှိနေလို့ပါရှင်။"
+        r = requests.post(url, json=data, timeout=10).json()
+        return r['candidates'][0]['content']['parts'][0]['text']
+    except: return "ခဏလေးနော်၊ အမရာ စဉ်းစားနေလို့ပါရှင်။"
 
-# ၃။ Render Health Check (Port Error မတက်အောင်)
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Amara is Live")
+def handle_bot():
+    last_update_id = 0
+    while True:
+        try:
+            updates = requests.get(f"{BASE_URL}/getUpdates?offset={last_update_id + 1}", timeout=10).json()
+            if "result" in updates:
+                for update in updates["result"]:
+                    last_update_id = update["update_id"]
+                    if "message" in update and "text" in update["message"]:
+                        chat_id = update["message"]["chat"]["id"]
+                        user_text = update["message"]["text"]
+                        requests.post(f"{BASE_URL}/sendChatAction", json={"chat_id": chat_id, "action": "typing"})
+                        reply = get_gemini_response(user_text)
+                        requests.post(f"{BASE_URL}/sendMessage", json={"chat_id": chat_id, "text": reply})
+        except: pass
+        time.sleep(1)
 
-def run_health_check():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
-    server.serve_forever()
-
-# ၄။ Telegram Bot Logic (Version 20+ Standard)
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ အသင့်ရှိနေပါပြီ။")
-
-async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_input = update.message.text
-    if not user_input: return
-    
-    await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    reply = get_gemini_response(user_input)
-    await update.message.reply_text(reply)
+# Render Port Binding
+class H(BaseHTTPRequestHandler):
+    def do_GET(self): self.send_response(200); self.end_headers(); self.wfile.write(b"Amara Active")
 
 if __name__ == '__main__':
-    # Health Check ကို Background မှာ မောင်းမယ်
-    threading.Thread(target=run_health_check, daemon=True).start()
-    
-    # Telegram Bot ကို Version 20+ ပုံစံနဲ့ မောင်းမယ်
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    
-    application.add_handler(CommandHandler('start', start))
-    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat))
-    
-    print("Bot is starting...")
-    application.run_polling()
+    threading.Thread(target=lambda: HTTPServer(('0.0.0.0', int(os.environ.get("PORT", 10000))), H).serve_forever(), daemon=True).start()
+    handle_bot()
