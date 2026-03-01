@@ -1,70 +1,32 @@
-import streamlit as st
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import google.generativeai as genai
-from gtts import gTTS
-import base64
 
-# ၁။ Page Setup
-st.set_page_config(page_title="အမရာဒေဝီ AI", page_icon="💃")
-st.markdown("<h1 style='text-align: center;'>💃 အမရာဒေဝီ</h1>", unsafe_allow_html=True)
+# ၁။ API Keys ထည့်ပါ
+TELEGRAM_TOKEN = "8741702013:AAF_2mu1VH_B3NpFnpFlg_51uvCT51mhVQg"
+GEMINI_KEY = "AIzaSyDtkx31Tg0-AoD--wcHcKiMgUfY2pjBILs"
 
-# ၂။ API Key ကို Code ထဲမှာ တိုက်ရိုက်ထည့်ခြင်း
-# လူကြီးမင်းရဲ့ Key အသစ်ကို အောက်က မျက်တောင်ဖျားထဲမှာ အစားထိုးထည့်ပါ
-YOUR_API_KEY = "AIzaSyDtkx31Tg0-AoD--wcHcKiMgUfY2pjBILs"
+# Gemini Setup
+genai.configure(api_key=GEMINI_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-genai.configure(api_key=YOUR_API_KEY)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ နိုးထလာပါပြီ။ တစ်ခုခု မေးလို့ရပါပြီရှင်။")
 
-# အလုပ်လုပ်နိုင်ခြေရှိတဲ့ Model တွေကို စစ်ဆေးခြင်း
-models_to_try = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-pro']
-
-if "active_model" not in st.session_state:
-    st.session_state.active_model = None
-    for m_name in models_to_try:
-        try:
-            temp_model = genai.GenerativeModel(m_name)
-            temp_model.generate_content("Hi", generation_config={"max_output_tokens": 1})
-            st.session_state.active_model = m_name
-            break
-        except:
-            continue
-
-if st.session_state.active_model:
-    model = genai.GenerativeModel(st.session_state.active_model)
-else:
-    st.error("API Key သို့မဟုတ် Model အဆင်မပြေဖြစ်နေပါသည်။ Key ကို သေချာပြန်စစ်ပေးပါ။")
-
-# ၃။ Audio Function
-def speak(text):
+async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_input = update.message.text
     try:
-        tts = gTTS(text=text, lang='my')
-        tts.save("speech.mp3")
-        with open("speech.mp3", "rb") as f:
-            data = f.read()
-            b64 = base64.b64encode(data).decode()
-            md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
-            st.markdown(md, unsafe_allow_html=True)
-    except:
-        pass
+        instruction = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။"
+        response = model.generate_content(f"{instruction}\n{user_input}")
+        await update.message.reply_text(response.text)
+    except Exception as e:
+        await update.message.reply_text(f"အမရာ စကားပြောဖို့ အခက်အခဲရှိနေတယ်ရှင်။ Error: {e}")
 
-# ၄။ Chat System
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-if prompt := st.chat_input("အမရာဒေဝီကို တစ်ခုခု မေးပါ..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
-    with st.chat_message("assistant"):
-        try:
-            role = "သင်ဟာ အမရာဒေဝီ အမည်ရှိ ချစ်စဖွယ် မိန်းကလေး AI ဖြစ်ပါတယ်။ မြန်မာလိုပဲ ချိုချိုသာသာ ဖြေပေးပါ။"
-            response = model.generate_content(f"{role}\n{prompt}")
-            reply = response.text
-            st.markdown(reply)
-            st.session_state.messages.append({"role": "assistant", "content": reply})
-            speak(reply)
-        except Exception as e:
-            st.error(f"Error: {e}")
+if __name__ == '__main__':
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat))
+    
+    application.run_polling()
