@@ -1,18 +1,32 @@
-import logging
+import os
+import asyncio
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
 import google.generativeai as genai
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
 
-# ၁။ API Keys ထည့်ပါ
-TELEGRAM_TOKEN = "8741702013:AAF_2mu1VH_B3NpFnpFlg_51uvCT51mhVQg"
-GEMINI_KEY = "AIzaSyDtkx31Tg0-AoD--wcHcKiMgUfY2pjBILs"
+# API Keys
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Gemini Setup
 genai.configure(api_key=GEMINI_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
+# Render ရဲ့ Port Error ကို ကျော်ဖို့ Dummy Server ဆောက်ခြင်း
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive")
+
+def run_health_check():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ နိုးထလာပါပြီ။ တစ်ခုခု မေးလို့ရပါပြီရှင်။")
+    await update.message.reply_text("မင်္ဂလာပါရှင်၊ အမရာဒေဝီ Telegram မှာ ရောက်ရှိနေပါပြီ။")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
@@ -21,12 +35,16 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = model.generate_content(f"{instruction}\n{user_input}")
         await update.message.reply_text(response.text)
     except Exception as e:
-        await update.message.reply_text(f"အမရာ စကားပြောဖို့ အခက်အခဲရှိနေတယ်ရှင်။ Error: {e}")
+        await update.message.reply_text(f"Error: {e}")
 
 if __name__ == '__main__':
-    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+    # Background မှာ Dummy Server မောင်းမယ်
+    threading.Thread(target=run_health_check, daemon=True).start()
     
+    # Telegram Bot မောင်းမယ်
+    application = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
     application.add_handler(CommandHandler('start', start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), chat))
     
+    print("Bot is starting with Port Health Check...")
     application.run_polling()
