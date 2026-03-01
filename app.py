@@ -11,7 +11,7 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY")
 
 genai.configure(api_key=GEMINI_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
 # Render ရဲ့ Port Error ကို ကျော်ဖို့ Dummy Server ဆောက်ခြင်း
 class HealthCheckHandler(BaseHTTPRequestHandler):
