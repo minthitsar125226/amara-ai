@@ -1,43 +1,53 @@
+
 import os, requests, time, threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 KEY = os.environ.get("GEMINI_API_KEY")
 
+# ၁။ Render ပေါ်မှာ Bot အမြဲတမ်း Live ဖြစ်နေစေဖို့
 class Health(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Bot is Running")
+        self.wfile.write(b"AI Toolkit Online")
 
-def get_ai_response(prompt):
-    # Gemini API သို့ တိုက်ရိုက်ချိတ်ဆက်ခြင်း
+def start_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), Health)
+    server.serve_forever()
+
+# ၂။ Gemini AI ဦးနှောက် (Smart Assistant Mode)
+def ask_gemini(text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={KEY}"
-    data = {"contents": [{"parts": [{"text": f"သင်ဟာ အမရာဒေဝီ ဖြစ်ပါတယ်။ မြန်မာလိုဖြေပါ။\nUser: {prompt}"}]}]}
+    # ဖုန်းမှာဖတ်ရလွယ်အောင် တိုတိုနဲ့လိုရင်းပဲ ဖြေခိုင်းထားပါတယ်
+    prompt = f"သင်ဟာ အလွန်တော်တဲ့ မြန်မာ AI လက်ထောက်တစ်ဦးပါ။ User ကို တိုတိုနဲ့ လိုရင်းပဲ ဖြေပေးပါ။\n\nUser: {text}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
     try:
-        r = requests.post(url, json=data, timeout=20)
+        r = requests.post(url, json=payload, timeout=30)
         res = r.json()
         if 'candidates' in res:
             return res['candidates'][0]['content']['parts'][0]['text']
-        # Error တက်ရင် ဘာကြောင့်လဲဆိုတာကို ပြန်ပြောခိုင်းမယ်
-        return f"AI Error: {res.get('error', {}).get('message', 'Unknown Error')}"
+        return f"AI System Error: {res.get('error', {}).get('message', 'Key စစ်ပါ')}"
     except Exception as e:
-        return f"Connection Error: {str(e)}"
+        return f"လိုင်းမကောင်းလို့ပါရှင်- {str(e)}"
 
+# ၃။ Telegram Bot Main Logic
 def main():
-    # Render Port Error မတက်အောင် Dummy server ဖွင့်ခြင်း
-    port = int(os.environ.get("PORT", 8080))
-    threading.Thread(target=lambda: HTTPServer(('0.0.0.0', port), Health).serve_forever(), daemon=True).start()
-    
+    threading.Thread(target=start_server, daemon=True).start()
     last_id = 0
+    print("AI Toolkit is Ready on your Phone!")
+    
     while True:
         try:
-            r = requests.get(f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={last_id+1}&timeout=30").json()
+            tg_url = f"https://api.telegram.org/bot{TOKEN}/getUpdates?offset={last_id+1}&timeout=30"
+            r = requests.get(tg_url, timeout=40).json()
             for up in r.get("result", []):
                 last_id = up["update_id"]
                 if "message" in up and "text" in up["message"]:
                     chat_id = up["message"]["chat"]["id"]
-                    reply = get_ai_response(up["message"]["text"])
+                    # AI အဖြေကို ရယူပြီး ပြန်ပို့ခြင်း
+                    reply = ask_gemini(up["message"]["text"])
                     requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", json={"chat_id": chat_id, "text": reply})
         except:
             time.sleep(5)
