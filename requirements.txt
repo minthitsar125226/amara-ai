@@ -1,3 +1,2 @@
-streamlit
+python-telegram-bot
 google-generativeai
-gTTS
