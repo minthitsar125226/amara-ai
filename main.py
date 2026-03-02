@@ -33,3 +33,21 @@ def echo_all(message):
     bot.reply_to(message, reply)
 
 bot.infinity_polling()
+import threading
+from flask import Flask
+
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Amara Devi is Online!"
+
+def run_port():
+    app.run(host='0.0.0.0', port=8080)
+
+# Port အတွက် thread တစ်ခုဖွင့်ခြင်း
+t = threading.Thread(target=run_port)
+t.start()
+
+# ဒါက လူကြီးမင်းရဲ့ Bot run တဲ့ code ပါ
+bot.infinity_polling()
