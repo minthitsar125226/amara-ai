@@ -2,7 +2,7 @@ import os
 import telebot
 import requests
 
-# ပတ်ဝန်းကျင် ကိန်းရှင်များမှ Data ယူခြင်း
+# Render Environment ကနေ Key တွေကို ယူခြင်း
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 OPENROUTER_KEY = os.environ.get('OPENROUTER_KEY')
 
@@ -15,39 +15,28 @@ def get_amara_response(user_input):
         "Content-Type": "application/json"
     }
     data = {
-        "model": "google/gemini-flash-1.5", # OpenRouter ထဲက model နာမည်
+        "model": "google/gemini-flash-1.5", # သို့မဟုတ် "openrouter/auto"
         "messages": [
-            {"role": "system", "content": "မင်းဟာ မြန်မာလို ကျွမ်းကျင်စွာ ပြောနိုင်တဲ့ အမရာဒေဝီ အမည်ရှိ AI တစ်ဦး ဖြစ်တယ်။ ဂိမ်းခန့်မှန်းချက်တွေကိုလည်း ကူညီပေးနိုင်ရမယ်။"},
+            {"role": "system", "content": "မင်းနာမည်က အမရာဒေဝီပါ။ မြန်မာလိုပဲ ပြန်ဖြေပေးပါ။"},
             {"role": "user", "content": user_input}
         ]
     }
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        return response.json()['choices'][0]['message']['content']
-    else:
-        return "ခေတ္တလိုင်းမကောင်းလို့ပါ၊ ခဏနေမှ ပြန်ကြိုးစားကြည့်ပေးပါနော်။"
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        response_json = response.json()
+        
+        # အဖြေကို သေချာထုတ်ယူခြင်း
+        if 'choices' in response_json and len(response_json['choices']) > 0:
+            return response_json['choices'][0]['message']['content']
+        else:
+            return f"OpenRouter က အဖြေမပေးနိုင်ဘူးဖြစ်နေတယ်ဗျ။ Error: {response_json.get('error', {}).get('message', 'Unknown')}"
+    except Exception as e:
+        return f"Error တစ်ခုခု တက်သွားတယ်: {str(e)}"
 
 @bot.message_handler(func=lambda message: True)
 def echo_all(message):
     reply = get_amara_response(message.text)
     bot.reply_to(message, reply)
 
-bot.infinity_polling()
-import threading
-from flask import Flask
-
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Amara Devi is Online!"
-
-def run_port():
-    app.run(host='0.0.0.0', port=8080)
-
-# Port အတွက် thread တစ်ခုဖွင့်ခြင်း
-t = threading.Thread(target=run_port)
-t.start()
-
-# ဒါက လူကြီးမင်းရဲ့ Bot run တဲ့ code ပါ
+# Bot ကို စတင်နှိုးခြင်း
 bot.infinity_polling()
